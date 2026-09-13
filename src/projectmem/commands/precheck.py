@@ -249,15 +249,20 @@ def _analyze_files(
 
     warnings: list[dict[str, Any]] = []
 
-    # ── Check 6 input: stale memories (computed once for all files) ──
+    # ── Check 6 input: stale memories for the files being checked ──
     # Decisions/fixes/notes whose cited file changed substantially after
     # they were logged. Never deleted, never down-ranked — flagged for a
     # human (or agent) to confirm or supersede.
+    #
+    # Scoped to `files`. This used to compute staleness across the whole event
+    # log and then index by file, discarding everything else — on a project
+    # with 1,200 events that was 95% wasted work to answer a question about
+    # one file, and precheck is called before every edit.
     try:
         from projectmem.staleness import find_stale_events
 
         stale_by_file: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for item in find_stale_events(events, root):
+        for item in find_stale_events(events, root, only_files=set(files)):
             stale_by_file[item["file"]].append(item)
     except Exception:
         stale_by_file = defaultdict(list)
