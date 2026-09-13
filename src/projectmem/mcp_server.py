@@ -457,8 +457,16 @@ def get_context(
     Read-only; assembles a freshly-budgeted context block from
     events.jsonl."""
     from projectmem.commands.context import generate_context
-    events = read_events(_root_for(project))
-    result = generate_context(events, token_budget=tokens, focus=focus, recent_days=30)
+    root = _root_for(project)
+    # root= matters: without it generate_context falls back to Path.cwd(), which
+    # for an MCP server is wherever the client launched the process — the agent
+    # harness directory, not the project. It reads git status and architecture
+    # from there, so the context describes the wrong tree entirely. Both CLI
+    # call sites already pass it; only this one did not.
+    events = read_events(root)
+    result = generate_context(
+        events, token_budget=tokens, focus=focus, recent_days=30, root=root
+    )
     return result["markdown"]
 
 

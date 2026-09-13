@@ -456,7 +456,11 @@ def main() -> None:
         app()
     except ProjectMemError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1) from exc
+        # SystemExit, not typer.Exit: nothing catches typer.Exit here, so it
+        # escaped main() and Python printed the whole chained traceback under
+        # the message. An expected condition — "no open issue yet" — was being
+        # reported as a crash.
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":
