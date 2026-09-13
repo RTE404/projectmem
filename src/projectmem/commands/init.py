@@ -34,7 +34,18 @@ def run(
     # honor root-level rule files even before the MCP server's own
     # `instructions=` field takes effect (L-004f).
     if not no_claude_md:
-        _ensure_claude_md(root_path)
+        # The registered name, so the bridge can tell an agent what to pass as
+        # `project=`. Registration is best-effort elsewhere in init, so fall
+        # back to the folder name — which is what slugify() derives the id from
+        # anyway — rather than omitting it.
+        try:
+            from projectmem.project_registry import load_registry, slugify
+
+            record = load_registry().find(str(root_path))
+            project_name = record.name if record else slugify(root_path.name)
+        except Exception:
+            project_name = root_path.name
+        _ensure_claude_md(root_path, project_name)
 
     # Auto-detect the stack and pre-populate PROJECT_MAP.md so Setup Mode
     # has something to refine instead of starting from a blank placeholder.
@@ -99,7 +110,7 @@ _CLAUDE_MD_BRIDGE_START = "<!-- >>> projectmem bridge >>> -->"
 _CLAUDE_MD_BRIDGE_END = "<!-- <<< projectmem bridge <<< -->"
 
 
-def _claude_md_bridge() -> str:
+def _claude_md_bridge(project_name: str | None = None) -> str:
     """The bridge block written into CLAUDE.md.
 
     Mirrors the MCP server's `instructions=` field (`mcp_server.py`):
@@ -112,10 +123,22 @@ def _claude_md_bridge() -> str:
     us safely re-emit / replace the block on later `pjm init` runs without
     clobbering the rest of the file.
     """
+    # Naming the project is what stops the first tool call going out without
+    # it. One server serves every repo, so a call that names no project gets
+    # refused — correctly, since guessing would write into the wrong audit
+    # trail — and the agent only learns the name from the error and retries.
+    # That round trip happened on every session because nothing ever told it
+    # (reported as #14 against 0.3.2).
+    named = (
+        f"This project is registered with projectmem as **{project_name}**.\n"
+        f"Pass `project=\"{project_name}\"` on any projectmem tool call.\n\n"
+        if project_name else ""
+    )
     return (
         f"{_CLAUDE_MD_BRIDGE_START}\n"
         "## projectmem (MANDATORY)\n\n"
         "This project uses projectmem for persistent memory + workflow rules.\n\n"
+        f"{named}"
         "SESSION START — call these three MCP tools, in this order, BEFORE\n"
         "answering ANY question about this project:\n\n"
         "  1. `get_instructions()` — loads the project's mandatory workflow\n"
@@ -134,7 +157,12 @@ def _claude_md_bridge() -> str:
         "  - After each fix attempt → `record_attempt(summary, outcome)`.\n"
         "  - After confirmation → `record_fix(summary)`.\n"
         "  - On a design choice → `add_decision(summary)`.\n"
-        "  - On a gotcha / setup detail → `add_note(summary)`.\n\n"
+        "  - On a gotcha / setup detail → `add_note(summary)`.\n"
+        "  - When a new decision REPLACES an older one → pass\n"
+        "    `supersedes=\"<old event id>\"` to `add_decision`. The log stays\n"
+        "    append-only; the old decision is tagged retired and drops out of\n"
+        "    summary.md, so the summary never shows two answers to the same\n"
+        "    question. Get ids from `get_summary()` or `search_events()`.\n\n"
         "Editing `.projectmem/summary.md` or `.projectmem/PROJECT_MAP.md`\n"
         "directly bypasses event logging and breaks audit replay. The\n"
         "summary file regenerates from `events.jsonl` automatically — write\n"
@@ -145,10 +173,10 @@ def _claude_md_bridge() -> str:
     )
 
 
-def _ensure_claude_md(root: Path) -> None:
+def _ensure_claude_md(root: Path, project_name: str | None = None) -> None:
     """Create or safely-update CLAUDE.md with the projectmem bridge block."""
     claude_md = root / "CLAUDE.md"
-    bridge = _claude_md_bridge()
+    bridge = _claude_md_bridge(project_name)
     if claude_md.exists():
         content = claude_md.read_text(encoding="utf-8")
         if _CLAUDE_MD_BRIDGE_START in content and _CLAUDE_MD_BRIDGE_END in content:
