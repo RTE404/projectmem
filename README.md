@@ -4,8 +4,8 @@
   <img src="https://raw.githubusercontent.com/projectmem/projectmemdoc/main/logo/projectmem-wordmark-800.png" alt="projectmem" width="420" />
 
   <p>
-    <a href="https://github.com/riponcm/projectmem/blob/main/CHANGELOG.md"><b>🎉 v0.3.2 is out</b></a> —
-    Windows support for the file watcher, and a doctor that notices when a fix gets undone.
+    <a href="https://github.com/riponcm/projectmem/blob/main/CHANGELOG.md"><b>🎉 v0.3.3 is out</b></a> —
+    `pjm precheck` no longer slows down as your project grows, and Windows works end to end.
     <a href="https://github.com/riponcm/projectmem/blob/main/CHANGELOG.md">See what changed →</a>
   </p>
 
@@ -164,7 +164,7 @@ cd your-project && pjm init
 |---|---|
 | **[Complete setup guide](https://projectmem.dev/blog/projectmem-complete-guide-ai-coding-agent-memory)** | The full walkthrough on the web — install, MCP setup per client, `pjm doctor`, your first logged issue, and both dashboards. Every terminal output is captured from a real run. |
 | **[TUTORIAL.md](TUTORIAL.md)** | 15-minute step-by-step walkthrough — set up projectmem on your own project, watch the lifecycle, see the pre-commit warning fire. |
-| **[CHANGELOG.md](CHANGELOG.md)** | Release history. Latest: v0.3.2 — the file watcher works on Windows, and `pjm doctor` spots a config fix that got reverted. |
+| **[CHANGELOG.md](CHANGELOG.md)** | Release history. Latest: v0.3.3 — `pjm precheck` is flat rather than linear in project age, and six Windows reports are closed. |
 | **[Research paper (arXiv:2606.12329)](https://arxiv.org/abs/2606.12329)** | *PROJECTMEM: A Local-First, Event-Sourced Memory and Judgment Layer for AI Coding Agents* — the peer-readable version: design, Memory-as-Governance framing, capability comparison, and the 207-event dogfooding study. |
 | **[LICENSE](LICENSE)** | MIT |
 
@@ -200,6 +200,51 @@ That's it. `pjm init` installs three git hooks (pre-commit warnings, post-commit
 > The canonical command is `projectmem`. A `pjm` alias is installed for speed.
 
 ---
+
+## ✨ New in 0.3.3 — precheck stops getting slower, and Windows works end to end
+
+`pjm precheck` runs before every edit — the instructions tell agents to call it
+first — so its cost is paid constantly. It was taking **26 seconds on a
+1,200-event project**, and getting worse every week, because it ran one
+`git log` per event to answer a question about a single file. It now makes one
+call per distinct *file*, bounded by the oldest event citing it.
+
+| events | before | after |
+|---|---|---|
+| 100 | 2,210 ms | 48 ms |
+| 400 | 8,905 ms | 51 ms |
+| 1,500 | ~33 s, 1,501 git processes | **82 ms, 2 processes** |
+
+Latency is now flat rather than linear in project age. Results are unchanged —
+verified against a reimplementation of the old algorithm, including across
+merge commits.
+
+**A retired decision no longer resurfaces.** `supersedes` has existed since
+0.1.4, but the two surfaces an agent actually reads during work — `get_context`
+and `precheck_file` — were not filtering it. You could retire a decision and
+still be told about it. Both filter now, and `AI_INSTRUCTIONS.md` finally
+documents how to retire one, which is why models never called it.
+
+**Your project is named in the bridge file, and `AGENTS.md` is written too.**
+One server serves every project, so a call naming none is refused rather than
+guessed at — but nothing told the agent the name, so it learned it from the
+error and retried, every session. The name is in the bridge now. It goes into
+`AGENTS.md` as well as `CLAUDE.md`, because Antigravity and Codex never read
+the latter.
+
+**Six Windows reports are closed.** Git hooks shipped a `bash` shebang that
+Git for Windows often cannot resolve — and an unresolvable shebang does not
+skip the hook, it aborts your commit. The baked binary path lost its
+backslashes to shell escaping. The venv fallback looked in `bin/`, which
+cannot exist there. `pjm watch --daemon` could not be seen or stopped. And a
+box-drawing character in the output killed `pjm init` outright on a cp1252
+console — after it had already created everything, so the command both did its
+work and reported failure.
+
+Every one was fixed by running projectmem on the machines that reported it —
+Windows 11, and the four MCP clients — not by reading the code. Reported by
+[@medium-effort](https://github.com/riponcm/projectmem/issues), who also
+contributed the 0.3.2 Windows daemon support.
 
 ## ✨ New in 0.3.2 — Windows, properly
 
@@ -357,7 +402,7 @@ Your project's memory is also something you can *watch* — and share.
 
 ## 🚧 Upcoming
 
-- **Import your existing memory** — `pjm import` *(planned for 0.3.3)* will migrate history from **mem0**, **agentmemory**, **Letta**, and Claude session logs into projectmem. It maps only to the core event vocabulary — issues, attempts, fixes, decisions, notes — so signal comes in and another tool's clutter stays out. Your judgment history moves with you.
+- **Import your existing memory** — `pjm import` *(planned for 0.4.0)* will migrate history from **mem0**, **agentmemory**, **Letta**, and Claude session logs into projectmem. It maps only to the core event vocabulary — issues, attempts, fixes, decisions, notes — so signal comes in and another tool's clutter stays out. Your judgment history moves with you.
 
 Want a source supported? [Open an issue](https://github.com/riponcm/projectmem/issues) and tell us what you're migrating from.
 
