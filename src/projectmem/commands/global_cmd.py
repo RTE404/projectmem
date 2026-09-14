@@ -20,6 +20,7 @@ from pathlib import Path
 
 import typer
 
+from projectmem.glyphs import RULE
 from projectmem.global_memory import (
     add_gotcha,
     add_pattern,
@@ -167,7 +168,7 @@ def _list_entries(
 
     if patterns:
         typer.echo(f"\n{bold}Patterns ({len(patterns)}){reset}")
-        typer.echo(f"{dim}{'─' * 60}{reset}")
+        typer.echo(f"{dim}{f'{RULE}' * 60}{reset}")
         for p in patterns:
             pid = p.get("id", "?")
             text = p.get("pattern", "")
@@ -187,7 +188,7 @@ def _list_entries(
 
     if gotchas:
         typer.echo(f"\n{bold}Library Gotchas ({len(gotchas)}){reset}")
-        typer.echo(f"{dim}{'─' * 60}{reset}")
+        typer.echo(f"{dim}{f'{RULE}' * 60}{reset}")
         for g in gotchas:
             gid = g.get("id", "?")
             lib = g.get("library", "unknown")
@@ -302,7 +303,7 @@ def _detect(root: Path | None = None, fmt: str = "text") -> None:
     reset = "\033[0m"
 
     typer.echo(f"\n{bold}Detected Stack: {root_path.name}{reset}")
-    typer.echo(f"{dim}{'─' * 50}{reset}")
+    typer.echo(f"{dim}{f'{RULE}' * 50}{reset}")
 
     if stack["tags"]:
         typer.echo(f"  Tags:       {cyan}{', '.join(stack['tags'])}{reset}")

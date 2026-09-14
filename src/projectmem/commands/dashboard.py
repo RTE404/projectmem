@@ -20,6 +20,7 @@ from pathlib import Path
 import typer
 
 from projectmem import __version__
+from projectmem.glyphs import ARROW, RUNNING
 from projectmem.models import Event
 from projectmem.storage import read_events, registered_projects, registry_path
 from projectmem.commands.score import calculate_score
@@ -412,7 +413,7 @@ def _serve(port: int, open_browser: bool) -> None:
 
     url = f"http://127.0.0.1:{port}"
     typer.echo("")
-    typer.echo(f"  ● Live global dashboard  →  {url}")
+    typer.echo(f"  {RUNNING} Live global dashboard  {ARROW}  {url}")
     typer.echo("    Reads every project's files fresh on each load; the Refresh")
     typer.echo("    button pulls the latest. Ephemeral — no background daemon.")
     typer.echo("    Press Ctrl+C to stop.")

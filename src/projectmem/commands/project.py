@@ -11,6 +11,7 @@ from pathlib import Path
 
 import typer
 
+from projectmem.glyphs import FAIL, OK, RUNNING
 from projectmem.project_registry import (
     ProjectRecord,
     RegistryError,
@@ -31,7 +32,7 @@ project_app = typer.Typer(
 
 
 def _fail(message: str) -> None:
-    typer.secho(f"✗ {message}", fg=typer.colors.RED)
+    typer.secho(f"{FAIL} {message}", fg=typer.colors.RED)
     raise typer.Exit(code=1)
 
 
@@ -56,7 +57,7 @@ def register_command(
         record = register(root, alias=alias)
     except RegistryError as exc:
         _fail(str(exc))
-    typer.secho(f"✓ Registered {record.name}", fg=typer.colors.GREEN)
+    typer.secho(f"{OK} Registered {record.name}", fg=typer.colors.GREEN)
     typer.echo(f"  {record.path}")
     typer.echo(f"  Use it from any folder:  pjm project use {record.name}")
 
@@ -138,7 +139,7 @@ def scan_command(
         note = "  (already registered)" if project in known else ""
         typer.echo(f"  {mark}{project}{note}")
     if not fresh:
-        typer.secho(f"\n✓ All {len(found)} already registered.", fg=typer.colors.GREEN)
+        typer.secho(f"\n{OK} All {len(found)} already registered.", fg=typer.colors.GREEN)
         return
     if dry_run:
         typer.echo(f"\n{len(fresh)} would be registered. Re-run without --dry-run.")
@@ -147,8 +148,8 @@ def scan_command(
         try:
             register(project)
         except RegistryError as exc:
-            typer.secho(f"  ✗ {project}: {exc}", fg=typer.colors.RED)
-    typer.secho(f"\n✓ Registered {len(fresh)} project(s).", fg=typer.colors.GREEN)
+            typer.secho(f"  {FAIL} {project}: {exc}", fg=typer.colors.RED)
+    typer.secho(f"\n{OK} Registered {len(fresh)} project(s).", fg=typer.colors.GREEN)
     typer.echo("  One MCP server now reaches them all — `pjm project list`.")
 
 
@@ -165,7 +166,7 @@ def list_command() -> None:
         typer.echo("  Otherwise run `pjm init` in a repo, or add one directly:")
         typer.echo("    pjm project register <path>")
         return
-    typer.echo(f"{len(registry.projects)} project(s)   ● = active\n")
+    typer.echo(f"{len(registry.projects)} project(s)   {RUNNING} = active\n")
     for record in registry.projects:
         typer.echo(_line(record, registry.active_project))
 
@@ -182,9 +183,9 @@ def use_command(
     except RegistryError as exc:
         _fail(str(exc))
     if record is None:
-        typer.secho("✓ Active project cleared", fg=typer.colors.GREEN)
+        typer.secho(f"{OK} Active project cleared", fg=typer.colors.GREEN)
         return
-    typer.secho(f"✓ Active project: {record.name}", fg=typer.colors.GREEN)
+    typer.secho(f"{OK} Active project: {record.name}", fg=typer.colors.GREEN)
     typer.echo(f"  {record.path}")
 
 
@@ -195,7 +196,7 @@ def remove_command(identifier: str) -> None:
         record = unregister(identifier)
     except RegistryError as exc:
         _fail(str(exc))
-    typer.secho(f"✓ Removed {record.name} from the registry", fg=typer.colors.GREEN)
+    typer.secho(f"{OK} Removed {record.name} from the registry", fg=typer.colors.GREEN)
     typer.echo(f"  {record.path} and its {MEM_DIR}/ are untouched.")
 
 
@@ -206,7 +207,7 @@ def alias_command(identifier: str, alias: str) -> None:
         record = set_alias(identifier, alias)
     except RegistryError as exc:
         _fail(str(exc))
-    typer.secho(f"✓ {record.id} is now also '{record.alias}'", fg=typer.colors.GREEN)
+    typer.secho(f"{OK} {record.id} is now also '{record.alias}'", fg=typer.colors.GREEN)
 
 
 @project_app.command("tag")
@@ -221,4 +222,4 @@ def tag_command(
     except RegistryError as exc:
         _fail(str(exc))
     tags = " ".join(f"#{t}" for t in record.tags) or "(none)"
-    typer.secho(f"✓ {record.name}: {tags}", fg=typer.colors.GREEN)
+    typer.secho(f"{OK} {record.name}: {tags}", fg=typer.colors.GREEN)

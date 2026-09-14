@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from projectmem.glyphs import configure_stdio
 from projectmem.commands import attempt as attempt_command
 from projectmem.commands import auto_capture as auto_capture_command
 from projectmem.commands import backfill as backfill_command
@@ -451,6 +452,11 @@ def _upgrade_notice() -> None:
 
 
 def main() -> None:
+    # Before anything prints. A legacy Windows console runs a code page that
+    # cannot encode our box-drawing glyphs, and an unencodable character does
+    # not degrade — it raises, mid-command, after the side effects have
+    # already landed (#18).
+    configure_stdio()
     _upgrade_notice()
     try:
         app()

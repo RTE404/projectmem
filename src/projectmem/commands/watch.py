@@ -24,6 +24,7 @@ from typing import Deque
 
 import typer
 
+from projectmem.glyphs import RUNNING, STOPPED
 from projectmem.models import Event
 from projectmem.storage import (
     MEM_DIR,
@@ -497,7 +498,7 @@ def _show_status(root: Path | None = None) -> None:
     pid = _running_pid(root)
     if pid is None:
         typer.echo(
-            "\033[2m○\033[0m \033[33mnot running\033[0m\n"
+            f"\033[2m{STOPPED}\033[0m \033[33mnot running\033[0m\n"
             "  Start with: pjm watch --daemon"
         )
         return
@@ -512,7 +513,7 @@ def _show_status(root: Path | None = None) -> None:
         uptime_str = f"{h}h {m}m" if h else f"{m}m"
 
     typer.echo(
-        f"\033[32m●\033[0m \033[32mrunning\033[0m · PID {pid}"
+        f"\033[32m{RUNNING}\033[0m \033[32mrunning\033[0m · PID {pid}"
         + (f" · uptime {uptime_str}" if uptime_str else "")
     )
     typer.echo(f"  Logs: .projectmem/watch.log")

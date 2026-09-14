@@ -26,6 +26,7 @@ from typing import Any
 
 import typer
 
+from projectmem.glyphs import RULE
 from projectmem.models import Event, location_to_file, superseded_ids
 from projectmem.storage import MEM_DIR, read_events, require_mem_dir
 
@@ -76,7 +77,7 @@ def _safe_echo(text: object = "", *, err: bool = False) -> None:
 def _rule(width: int = 60) -> str:
     encoding = _stdout_encoding().lower()
     if "utf" in encoding:
-        return "─" * width
+        return RULE * width
     return "-" * width
 
 

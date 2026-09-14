@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 
+from projectmem.glyphs import ARROW, RULE_DOUBLE, WARN
 from projectmem.storage import initialize
 
 
@@ -343,9 +344,9 @@ def _inherit_global_memory(root: Path, filter_tags: str | None = None) -> None:
     tags_str = ", ".join(stack["tags"][:5])
     typer.echo(f"\n  Global memory: Detected stack [{tags_str}]")
     if r_gotchas:
-        typer.echo(f"    → {len(r_gotchas)} library gotchas injected into AI_INSTRUCTIONS.md")
+        typer.echo(f"    {ARROW} {len(r_gotchas)} library gotchas injected into AI_INSTRUCTIONS.md")
     if r_patterns:
-        typer.echo(f"    → {len(r_patterns)} patterns injected into AI_INSTRUCTIONS.md")
+        typer.echo(f"    {ARROW} {len(r_patterns)} patterns injected into AI_INSTRUCTIONS.md")
 
 
 # ── L-048: pre-populate PROJECT_MAP.md from detected stack ──────────────
@@ -719,7 +720,7 @@ def _print_mcp_config(root: Path, single_project: bool = False) -> None:
     # client silently fails to parse.
     py_raw = sys.executable
     py = json.dumps(py_raw)[1:-1]
-    bar = "═" * 62
+    bar = RULE_DOUBLE * 62
     typer.echo("")
     typer.echo(bar)
     if single_project:
@@ -762,7 +763,7 @@ def _print_mcp_config(root: Path, single_project: bool = False) -> None:
         pinned = _pinned_client_configs()
         if pinned:
             typer.secho(
-                "  ⚠ An existing config still pins projectmem to one repo:",
+                f"  {WARN} An existing config still pins projectmem to one repo:",
                 fg=typer.colors.YELLOW,
             )
             for client, path in pinned:

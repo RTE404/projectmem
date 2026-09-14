@@ -22,6 +22,7 @@ from pathlib import Path
 import typer
 
 from projectmem import __version__
+from projectmem.glyphs import FAIL, OK, WARN
 from projectmem.commands.init import (
     _pinned_client_configs,
     _projectmem_client_configs,
@@ -189,7 +190,7 @@ def _update_line(online: bool) -> None:
     meta = load_meta()
     enabled = bool(meta.get("update_check"))
     if not (online or enabled):
-        typer.secho(f"\n  ✓ Running {__version__}", fg=typer.colors.GREEN)
+        typer.secho(f"\n  {OK} Running {__version__}", fg=typer.colors.GREEN)
         typer.echo("      Check PyPI for a newer release:  pjm doctor --online")
         typer.echo("      Check daily from now on:         pjm doctor --auto")
         typer.echo("      (projectmem makes no network calls unless you ask.)")
@@ -207,17 +208,17 @@ def _update_line(online: bool) -> None:
             meta["update_latest"] = fetched
             save_meta(meta)
     if not newest:
-        typer.secho(f"\n  ✓ Running {__version__}", fg=typer.colors.GREEN)
+        typer.secho(f"\n  {OK} Running {__version__}", fg=typer.colors.GREEN)
         typer.echo("      Could not reach PyPI — nothing else was affected.")
         return
     if _as_tuple(newest) > _as_tuple(__version__):
         typer.secho(
-            f"\n  ⚠ {newest} is available (you have {__version__})",
+            f"\n  {WARN} {newest} is available (you have {__version__})",
             fg=typer.colors.YELLOW,
         )
         typer.echo("      pip install -U projectmem")
     else:
-        typer.secho(f"\n  ✓ Running {__version__} — the latest", fg=typer.colors.GREEN)
+        typer.secho(f"\n  {OK} Running {__version__} — the latest", fg=typer.colors.GREEN)
 
 
 
@@ -299,7 +300,7 @@ def run(
     if auto is not None:
         set_auto_check(auto)
         typer.secho(
-            f"✓ Automatic update checks {'on (once a day)' if auto else 'off'}\n",
+            f"{OK} Automatic update checks {'on (once a day)' if auto else 'off'}\n",
             fg=typer.colors.GREEN,
         )
     scan_roots = [r.expanduser().resolve() for r in roots] if roots else default_roots()
@@ -333,7 +334,7 @@ def run(
     if missing:
         problems += 1
         typer.secho(
-            f"  ⚠ {len(missing)} project(s) have memory but are not registered",
+            f"  {WARN} {len(missing)} project(s) have memory but are not registered",
             fg=typer.colors.YELLOW,
         )
         for project in missing[:10]:
@@ -345,24 +346,24 @@ def run(
                 try:
                     register(project)
                 except RegistryError as exc:
-                    typer.secho(f"      ✗ {project}: {exc}", fg=typer.colors.RED)
-            typer.secho(f"  ✓ Registered {len(missing)}", fg=typer.colors.GREEN)
+                    typer.secho(f"      {FAIL} {project}: {exc}", fg=typer.colors.RED)
+            typer.secho(f"  {OK} Registered {len(missing)}", fg=typer.colors.GREEN)
     else:
-        typer.secho(f"  ✓ All {len(found)} project(s) found are registered", fg=typer.colors.GREEN)
+        typer.secho(f"  {OK} All {len(found)} project(s) found are registered", fg=typer.colors.GREEN)
 
     # ── 2. registry entries whose memory is gone ──
     stale = [r for r in registry.projects if not (r.path / MEM_DIR).is_dir()]
     if stale:
         problems += 1
-        typer.secho(f"\n  ⚠ {len(stale)} registered project(s) no longer have memory", fg=typer.colors.YELLOW)
+        typer.secho(f"\n  {WARN} {len(stale)} registered project(s) no longer have memory", fg=typer.colors.YELLOW)
         for record in stale:
             typer.echo(f"      {record.name}  {record.path}")
         if fix:
             for record in stale:
                 unregister(record.id)
-            typer.secho(f"  ✓ Removed {len(stale)} from the registry (repos untouched)", fg=typer.colors.GREEN)
+            typer.secho(f"  {OK} Removed {len(stale)} from the registry (repos untouched)", fg=typer.colors.GREEN)
     else:
-        typer.secho("\n  ✓ Every registered project still has its memory", fg=typer.colors.GREEN)
+        typer.secho(f"\n  {OK} Every registered project still has its memory", fg=typer.colors.GREEN)
 
     # ── 3. client configs still pinned to one repo ──
     # Scanned once here so the project-scoped configs are included and the
@@ -372,14 +373,14 @@ def run(
     pinned = [(c, p) for c, p, st in scanned if st == "pinned"]
     if unreadable:
         problems += 1
-        typer.secho("\n  ⚠ Could not read some client config(s) — not checked",
+        typer.secho(f"\n  {WARN} Could not read some client config(s) — not checked",
                     fg=typer.colors.YELLOW)
         for client, path in unreadable:
             typer.echo(f"      {client}  {path}")
         typer.echo("      A config that cannot be read is not a config that is fine.")
     if pinned:
         problems += 1
-        typer.secho("\n  ⚠ MCP client config(s) still pinned to a single repo", fg=typer.colors.YELLOW)
+        typer.secho(f"\n  {WARN} MCP client config(s) still pinned to a single repo", fg=typer.colors.YELLOW)
         for client, path in pinned:
             typer.echo(f"      {client}  {path}")
         typer.echo('      Remove --root / cwd / PROJECTMEM_ROOT from the projectmem entry.')
@@ -396,7 +397,7 @@ def run(
                 fg=typer.colors.RED)
     else:
         _reverted_configs([])   # record the clean state so a later revert is visible
-        typer.secho("\n  ✓ No MCP client config is pinned to a single repo", fg=typer.colors.GREEN)
+        typer.secho(f"\n  {OK} No MCP client config is pinned to a single repo", fg=typer.colors.GREEN)
 
     _update_line(online)
 
