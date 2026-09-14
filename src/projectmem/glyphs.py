@@ -58,6 +58,10 @@ def configure_stdio() -> None:
             # A detached or already-closed stream. Nothing to protect.
             pass
 
+    if ASCII:
+        sys.stdout = _AsciiFoldingStream(sys.stdout)
+        sys.stderr = _AsciiFoldingStream(sys.stderr)
+
 
 ASCII = not _stream_handles_unicode()
 
@@ -84,3 +88,52 @@ ARROW = _pick("→", "->")
 # Meter fill. Also one column each — the bar's width is computed, not measured.
 BAR_FULL = _pick("█", "#")
 BAR_EMPTY = _pick("░", ".")
+
+
+# ── Punctuation, which fails a different way ─────────────────────────────────
+#
+# The constants above cover characters cp1252 cannot encode at all. Our prose
+# also carries punctuation it CAN encode — an em dash is 0x97, an ellipsis
+# 0x85 — so nothing above touches them and `errors="replace"` never fires.
+# They still come out wrong: Python writes the cp1252 byte, a terminal set to
+# UTF-8 tries to decode 0x97 as a UTF-8 lead byte, finds it invalid, and shows
+# U+FFFD. The glyph was encodable and the result is still a black diamond.
+#
+# These live in ordinary sentences rather than in named constants, so they are
+# folded at the stream instead of at each call site.
+
+_FOLD = str.maketrans({
+    "—": "--",
+    "–": "-",
+    "…": "...",
+    "·": "*",
+    "’": "'",
+    "‘": "'",
+    "“": '"',
+    "”": '"',
+    "−": "-",
+    " ": " ",  # non-breaking space
+})
+
+
+class _AsciiFoldingStream:
+    """Writes ASCII-folded text through to the real stream.
+
+    Delegates everything else, so `click` still sees a stream it recognises —
+    `isatty()` in particular decides whether colour is emitted.
+    """
+
+    def __init__(self, stream) -> None:
+        self._stream = stream
+
+    def write(self, text):
+        if isinstance(text, str):
+            text = text.translate(_FOLD)
+        return self._stream.write(text)
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)

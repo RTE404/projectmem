@@ -124,3 +124,55 @@ def test_configure_stdio_tolerates_a_stream_it_cannot_reconfigure(tmp_path):
         configure_stdio()  # must not raise
     finally:
         sys.stdout = original
+
+
+def test_cp1252_output_contains_no_byte_that_renders_as_a_black_diamond(tmp_path):
+    """The second Windows report: characters that encode but still look wrong.
+
+    An em dash IS cp1252-encodable (0x97), so the glyph constants never
+    substitute it and errors="replace" never fires. Python writes 0x97, a
+    terminal set to UTF-8 reads it as a lead byte, finds it invalid, and
+    shows U+FFFD. Encodable and still broken.
+
+    The guarantee is stronger than "no exception": on a stream that cannot
+    carry Unicode we emit no non-ASCII byte at all, so no decoder on the
+    other end has anything to misread.
+    """
+    repo = _repo(tmp_path)
+    env = _cp1252_env(tmp_path)
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "from projectmem.cli import main; import sys;"
+         " sys.argv=['pjm','init']; main()"],
+        cwd=repo, env=env, capture_output=True,  # bytes, not text
+    )
+
+    high = [b for b in result.stdout if b > 127]
+    assert not high, f"{len(high)} non-ASCII bytes on a cp1252 stream"
+    result.stdout.decode("utf-8")  # raises if any byte could render as U+FFFD
+
+
+def test_utf8_output_keeps_its_real_characters(tmp_path):
+    """The fallbacks must not follow us onto a capable terminal."""
+    repo = _repo(tmp_path)
+    import os
+    env = {**_cp1252_env(tmp_path), "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "from projectmem.cli import main; import sys;"
+         " sys.argv=['pjm','init']; main()"],
+        cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8",
+    )
+
+    assert "═" in result.stdout, "the real rule was replaced on a UTF-8 stream"
+    assert "—" in result.stdout, "em dashes were folded on a UTF-8 stream"
+
+
+def test_folding_stream_still_looks_like_a_stream():
+    """click asks isatty() to decide on colour; a naive wrapper breaks that."""
+    from projectmem.glyphs import _AsciiFoldingStream
+
+    wrapped = _AsciiFoldingStream(sys.__stdout__)
+    assert hasattr(wrapped, "isatty")
+    assert wrapped.isatty() == sys.__stdout__.isatty()
+    assert wrapped.encoding == sys.__stdout__.encoding
