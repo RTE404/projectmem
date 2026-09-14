@@ -165,3 +165,116 @@ def test_every_agent_facing_surface_filters_superseded():
         assert "superseded_ids" in inspect.getsource(mod), (
             f"{mod.__name__} does not filter retired events"
         )
+
+
+# ── the bridge must reach clients that do not read CLAUDE.md ────────────────
+#
+# Antigravity never reads CLAUDE.md — a user reported copying the block into
+# AGENTS.md by hand to make projectmem work at all (#14). AGENTS.md is a
+# cross-tool convention, not an Antigravity one, so both files are written
+# always rather than on detection: pjm init runs once and the choice of client
+# comes later.
+
+def test_init_writes_the_bridge_to_both_rule_files(tmp_path, monkeypatch):
+    from conftest import set_fake_home
+    from projectmem.commands.init import run as init_run
+
+    set_fake_home(monkeypatch, tmp_path / "home")
+    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    project = tmp_path / "checkout-api"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    init_run(root=project)
+
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        text = (project / name).read_text(encoding="utf-8")
+        assert "projectmem (MANDATORY)" in text, f"{name} has no bridge"
+        assert "checkout-api" in text, f"{name} does not name the project"
+
+
+def test_both_rule_files_say_exactly_the_same_thing(tmp_path, monkeypatch):
+    """Two copies that can drift are worse than one that is missing."""
+    from conftest import set_fake_home
+    from projectmem.commands.init import (
+        _CLAUDE_MD_BRIDGE_END,
+        _CLAUDE_MD_BRIDGE_START,
+        run as init_run,
+    )
+
+    set_fake_home(monkeypatch, tmp_path / "home")
+    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    project = tmp_path / "app"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    init_run(root=project)
+
+    def block(name):
+        t = (project / name).read_text(encoding="utf-8")
+        return t[t.index(_CLAUDE_MD_BRIDGE_START):t.index(_CLAUDE_MD_BRIDGE_END)]
+
+    assert block("CLAUDE.md") == block("AGENTS.md")
+
+
+def test_an_existing_agents_md_is_preserved(tmp_path, monkeypatch):
+    """Users already have AGENTS.md files. Do not clobber them."""
+    from conftest import set_fake_home
+    from projectmem.commands.init import run as init_run
+
+    set_fake_home(monkeypatch, tmp_path / "home")
+    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    project = tmp_path / "app"
+    project.mkdir()
+    (project / "AGENTS.md").write_text("# House rules\n\nAlways run the tests.\n")
+    monkeypatch.chdir(project)
+    init_run(root=project)
+
+    text = (project / "AGENTS.md").read_text(encoding="utf-8")
+    assert "Always run the tests." in text, "existing content was destroyed"
+    assert "projectmem (MANDATORY)" in text
+
+
+def test_re_running_init_does_not_duplicate_the_block(tmp_path, monkeypatch):
+    from conftest import set_fake_home
+    from projectmem.commands.init import _CLAUDE_MD_BRIDGE_START, run as init_run
+
+    set_fake_home(monkeypatch, tmp_path / "home")
+    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    project = tmp_path / "app"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    init_run(root=project)
+    init_run(root=project)
+
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        text = (project / name).read_text(encoding="utf-8")
+        assert text.count(_CLAUDE_MD_BRIDGE_START) == 1, f"{name} has a duplicate block"
+
+
+def test_list_projects_leads_with_the_active_project(tmp_path, monkeypatch):
+    """The one name the caller wants should not be on line 14 of 16."""
+    from projectmem import mcp_server
+    from projectmem.project_registry import register, set_active
+    from projectmem.storage import initialize
+
+    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    for name in ("alpha", "beta", "gamma"):
+        d = tmp_path / name
+        d.mkdir()
+        initialize(d)
+        register(d)
+    set_active("beta")
+
+    fn = mcp_server.list_projects
+    out = (fn.fn if hasattr(fn, "fn") else fn)()
+
+    assert out.splitlines()[0].startswith("ACTIVE: beta")
+    assert "You do not need to pass it" in out
+
+
+def test_instructions_do_not_tell_the_agent_to_list_projects_first():
+    """We were telling it to, then counting the call as waste."""
+    from projectmem.mcp_server import _GLOBAL_INSTRUCTIONS
+
+    text = _GLOBAL_INSTRUCTIONS.lower()
+    assert "do not look the project up before you start" in text
+    assert "only if a call has actually failed" in text

@@ -173,29 +173,48 @@ def _claude_md_bridge(project_name: str | None = None) -> str:
     )
 
 
-def _ensure_claude_md(root: Path, project_name: str | None = None) -> None:
-    """Create or safely-update CLAUDE.md with the projectmem bridge block."""
-    claude_md = root / "CLAUDE.md"
+def _ensure_bridge_file(
+    path: Path, title: str, project_name: str | None = None
+) -> None:
+    """Create or safely-update one rule file with the projectmem bridge block.
+
+    The markers make this idempotent: a later `pjm init` replaces the block in
+    place and leaves everything the user wrote around it alone.
+    """
     bridge = _claude_md_bridge(project_name)
-    if claude_md.exists():
-        content = claude_md.read_text(encoding="utf-8")
+    label = path.name
+    if path.exists():
+        content = path.read_text(encoding="utf-8")
         if _CLAUDE_MD_BRIDGE_START in content and _CLAUDE_MD_BRIDGE_END in content:
-            # Replace existing bridge in-place.
             start = content.index(_CLAUDE_MD_BRIDGE_START)
             end = content.index(_CLAUDE_MD_BRIDGE_END) + len(_CLAUDE_MD_BRIDGE_END)
             new_content = content[:start] + bridge.rstrip() + content[end:]
             if new_content == content:
                 return
-            claude_md.write_text(new_content, encoding="utf-8")
-            typer.echo("  CLAUDE.md: projectmem bridge refreshed.")
+            path.write_text(new_content, encoding="utf-8")
+            typer.echo(f"  {label}: projectmem bridge refreshed.")
             return
-        # Append, preserving the user's existing content.
-        new_content = content.rstrip("\n") + "\n\n" + bridge
-        claude_md.write_text(new_content, encoding="utf-8")
-        typer.echo("  CLAUDE.md: projectmem bridge appended.")
+        path.write_text(content.rstrip("\n") + "\n\n" + bridge, encoding="utf-8")
+        typer.echo(f"  {label}: projectmem bridge appended.")
         return
-    claude_md.write_text("# CLAUDE.md\n\n" + bridge, encoding="utf-8")
-    typer.echo("  CLAUDE.md: created with projectmem bridge.")
+    path.write_text(f"# {title}\n\n" + bridge, encoding="utf-8")
+    typer.echo(f"  {label}: created with projectmem bridge.")
+
+
+def _ensure_claude_md(root: Path, project_name: str | None = None) -> None:
+    """Write the bridge to both rule files agents actually read.
+
+    CLAUDE.md alone was an assumption that stopped being true. Antigravity
+    never reads it — a user reported copying the block into AGENTS.md by hand
+    to make it work (#14) — and Codex reads AGENTS.md too.
+
+    Both files, always, rather than detecting the client: `pjm init` runs once
+    and the choice of tool comes later, so detection would leave the file
+    missing exactly when someone adopts a new one. Both are generated from the
+    same function, so they cannot say different things.
+    """
+    _ensure_bridge_file(root / "CLAUDE.md", "CLAUDE.md", project_name)
+    _ensure_bridge_file(root / "AGENTS.md", "AGENTS.md", project_name)
 
 
 def _try_auto_backfill(root: Path) -> None:

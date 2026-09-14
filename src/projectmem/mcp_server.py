@@ -166,12 +166,18 @@ def safe_tool(fn: Callable) -> Callable:
 
 _GLOBAL_INSTRUCTIONS = (
     "\n\nTHIS SERVER SERVES SEVERAL PROJECTS. Every repo tool takes an "
-    "optional `project` argument (a registered id, alias, or path). When you "
-    "know which project the user means, pass it — it is the only way to be "
-    "certain a write lands in the right repository. If you omit it, the "
-    "server uses the active project or the folder you are in, and refuses to "
-    "guess when neither is available. Call list_projects to see the names, "
-    "and current_project to check where a write would go before making it. "
+    "optional `project` argument (a registered id, alias, or path).\n\n"
+    "Do NOT look the project up before you start. Just call the tool. If you "
+    "omit `project`, the server resolves it from the active project or the "
+    "folder you are working in, which is almost always right. It refuses "
+    "rather than guesses when it cannot tell, and the refusal names the "
+    "projects — so the cost of simply trying is one clear error, while the "
+    "cost of checking first is a wasted call on every session.\n\n"
+    "Pass `project` when you already know the name — the repo you were asked "
+    "about, or the one a previous tool reported writing to. Call "
+    "list_projects only if a call has actually failed to resolve, or the user "
+    "names a repository you cannot place; current_project answers 'where "
+    "would a write go' without listing everything.\n\n"
     "Write tools tell you which project they wrote to; if that name is not "
     "the project you meant, stop and say so."
 )
@@ -747,7 +753,18 @@ def list_projects() -> str:
             "No projects registered. Run `pjm init` in a repo (it registers "
             "automatically), or `pjm project register <path>`."
         )
-    lines = [f"{len(registry.projects)} project(s) — pass one as `project`:"]
+    # Lead with the active project. It is the answer the caller almost always
+    # wants, and burying it on line 14 of 16 means the whole inventory — every
+    # project name and path on the machine — gets read to find one name.
+    active = registry.active()
+    lines = []
+    if active is not None:
+        lines.append(f"ACTIVE: {active.name} — {active.path}")
+        lines.append(
+            "Calls that omit `project` go here. You do not need to pass it."
+        )
+        lines.append("")
+    lines.append(f"{len(registry.projects)} project(s) — pass one as `project`:")
     for record in registry.projects:
         mark = " (active)" if record.id == registry.active_project else ""
         alias = f" / {record.alias}" if record.alias else ""
