@@ -10,6 +10,8 @@
 
 - **`get_context` described the wrong directory.** `generate_context` defaults its root to `Path.cwd()`, and the MCP server was the only caller that omitted it — both CLI call sites pass it. For an MCP server, cwd is wherever the client launched the process, so the git status and architecture came from the agent harness rather than your project. ([#15](https://github.com/riponcm/projectmem/issues/15))
 
+- **`precheck_file` invented warnings about every project but the server's own.** The tool resolved the project root to read events, then called `_analyze_files` without it, so staleness asked "does this cited file exist?" relative to the MCP server's working directory. In global mode that is the agent harness, so a four-file precheck on an untouched repo came back with 373 phantom "cited file no longer exists" warnings. `_analyze_files` had the same gap one level down — it took the root but called `_git_recent_changes` without it, so `git log` ran in the wrong repository, and outside a repository git fails and the churn count silently fell back to the event log, reporting churn the project did not have. Both surface only when the root differs from cwd, which is every MCP client that does not chdir into the project and never the CLI — which is why `pjm precheck` was always correct.
+
 - **Expected errors were reported as crashes.** `pjm fix` with no open issue printed a clear message and then a full traceback underneath it. `typer.Exit` escaped `main()` uncaught, so Python printed the chained cause.
 
 ### Faster
@@ -27,6 +29,8 @@
 ### Changed
 
 - **Your project is named in `CLAUDE.md`.** One server serves every project, so a tool call that names none is refused rather than guessed at — but nothing ever told the agent the name, so it learned it from the error and retried. That round trip happened every session. The bridge now carries the registered name and the exact argument to pass. ([#14](https://github.com/riponcm/projectmem/issues/14))
+
+- **`AGENTS.md` is written alongside `CLAUDE.md`.** The 0.3.3 fix for #14 put the project name in `CLAUDE.md` — which Antigravity and Codex never read, so for those clients the fix did not exist. `pjm init` now writes both files with identical content, and the guidance no longer asks the agent to look the project up before starting: it names the active project first and says calls that omit `project` land there. ([#14](https://github.com/riponcm/projectmem/issues/14))
 
 - **Retiring a decision is discoverable.** `supersedes` has existed since 0.1.4 and the summary renderer honours it, but `AI_INSTRUCTIONS.md` mentioned it zero times in 12,503 characters, so models never called it and `summary.md` accumulated decisions that contradicted each other. It is documented now on all three surfaces an agent may read, and each says what it does to the summary rather than only that the argument exists. ([#17](https://github.com/riponcm/projectmem/issues/17))
 
