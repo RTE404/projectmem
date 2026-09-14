@@ -101,3 +101,67 @@ def test_the_three_surfaces_agree_about_the_session_start_order():
         assert ordered[:2] == ["get_instructions", "get_summary"], (
             f"{name} lists the session-start trio as {ordered[:3]}"
         )
+
+
+# ── a retired decision must not resurface anywhere an agent reads ───────────
+#
+# Caught in Antigravity: summary.md correctly showed one decision while
+# get_context handed the model both — the retired one and its replacement,
+# with equal timestamps and nothing to distinguish them. A model could do
+# everything right and still be told two contradictory things, which is the
+# exact failure superseding exists to prevent.
+
+def _decisions(tmp_path):
+    """A retired decision and the one that replaced it.
+
+    Timestamps are relative: generate_context scores on a 30-day recency
+    window, so fixed dates silently fall out of scope and the test passes for
+    the wrong reason — an empty context contains no retired decision either.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from projectmem.models import Event
+
+    now = datetime.now(timezone.utc)
+    stamp = lambda days: (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    old = Event(id="evt_old", type="decision", timestamp=stamp(3),
+                summary="Use Python http.server for the web UI",
+                location="src/api/routes.py:1")
+    new = Event(id="evt_new", type="decision", timestamp=stamp(1),
+                summary="Switch to TypeScript for the web UI",
+                location="src/api/routes.py:1", supersedes="evt_old")
+    return [old, new]
+
+
+def test_get_context_drops_a_superseded_decision(tmp_path):
+    from projectmem.commands.context import generate_context
+    from projectmem.storage import initialize
+
+    initialize(tmp_path)          # generate_context reads the project's own dir
+    md = generate_context(_decisions(tmp_path), token_budget=2000, root=tmp_path)["markdown"]
+
+    assert "TypeScript" in md, "the current decision must survive"
+    assert "http.server" not in md, "the retired decision was presented as current"
+
+
+def test_precheck_does_not_warn_from_a_retired_event(tmp_path):
+    """Warning off an approach someone explicitly retired is worse than silence."""
+    from projectmem.commands.precheck import _events_for_file
+
+    live = _events_for_file("src/api/routes.py", _decisions(tmp_path))
+
+    assert [e.id for e in live] == ["evt_new"]
+
+
+def test_every_agent_facing_surface_filters_superseded():
+    """Five surfaces filtered; context and precheck did not. Pin all of them."""
+    import inspect
+
+    from projectmem import summary as summary_mod
+    from projectmem.commands import brief, context, export, precheck, search
+
+    for mod in (summary_mod, brief, context, export, precheck, search):
+        assert "superseded_ids" in inspect.getsource(mod), (
+            f"{mod.__name__} does not filter retired events"
+        )

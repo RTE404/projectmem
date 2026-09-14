@@ -22,7 +22,7 @@ from typing import Any
 
 import typer
 
-from projectmem.models import Event, location_to_file
+from projectmem.models import Event, location_to_file, superseded_ids
 from projectmem.storage import (
     read_events,
     require_mem_dir,
@@ -108,8 +108,17 @@ def generate_context(
     git_files = _get_git_status_files(root_path)
 
     # ── Score and filter events ──
+    # Retired decisions are dropped. summary.md has always filtered these, but
+    # this block did not — so a model could correctly call add_decision(...,
+    # supersedes=...), see summary.md show one decision, and still be handed
+    # both here with equal timestamps and no way to tell which is current.
+    # That is the exact failure superseding exists to prevent, on the surface
+    # agents actually read. The log keeps both; only the live view filters.
+    retired = superseded_ids(events)
     scored: list[tuple[float, Event]] = []
     for event in events:
+        if event.id in retired:
+            continue
         score = _score_event(event, now, cutoff, focus, git_files)
         if score > 0:
             scored.append((score, event))

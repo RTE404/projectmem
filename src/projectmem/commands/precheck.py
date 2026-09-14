@@ -26,7 +26,7 @@ from typing import Any
 
 import typer
 
-from projectmem.models import Event, location_to_file
+from projectmem.models import Event, location_to_file, superseded_ids
 from projectmem.storage import MEM_DIR, read_events, require_mem_dir
 
 
@@ -409,9 +409,17 @@ def _analyze_files(
 
 
 def _events_for_file(file_path: str, events: list[Event]) -> list[Event]:
-    """Return all events that reference this file."""
+    """Return all live events that reference this file.
+
+    Superseded events are excluded. Warning someone off an approach on the
+    strength of a decision they explicitly retired is worse than not warning
+    at all — it makes the memory look wrong at the moment it interrupts you.
+    """
+    retired = superseded_ids(events)
     matching: list[Event] = []
     for e in events:
+        if e.id in retired:
+            continue
         # Direct files list
         if file_path in e.files:
             matching.append(e)

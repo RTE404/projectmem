@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.3
+
+**Three reports from Windows, and the tool no longer freezes as your project grows.** Every fix below was found by running projectmem on a real machine, not by reading the code.
+
+### Fixed
+
+- **`pjm watch --daemon` could not be seen or stopped on Windows, and leaked a process per run.** A hook whose shebang cannot be resolved does not get skipped — git aborts the commit. The hooks shipped `#!/usr/bin/env bash`, which depends on PATH; Git for Windows maps `/bin/sh` to its own shell, and under GitHub Desktop bash often is not there. The snippet body only ever used `[ ]`, `command -v` and `$( )`, so bash bought nothing. Two more faults fed the same failure: the baked binary path went in raw, and on Windows the shell ate its backslashes (`C:\Users\ripon` became `C:\Usersipon`), so the `-x` test failed and the hook silently fell through to its PATH lookup — it only ever worked by accident; and the venv fallback looked in `<prefix>/bin/pjm`, which cannot exist on Windows. ([#16](https://github.com/riponcm/projectmem/issues/16))
+
+- **`get_context` described the wrong directory.** `generate_context` defaults its root to `Path.cwd()`, and the MCP server was the only caller that omitted it — both CLI call sites pass it. For an MCP server, cwd is wherever the client launched the process, so the git status and architecture came from the agent harness rather than your project. ([#15](https://github.com/riponcm/projectmem/issues/15))
+
+- **Expected errors were reported as crashes.** `pjm fix` with no open issue printed a clear message and then a full traceback underneath it. `typer.Exit` escaped `main()` uncaught, so Python printed the chained cause.
+
+### Faster
+
+- **`pjm precheck` was taking 26 seconds on a 1,200-event project, and getting worse as the project aged.** It ran one `git log` per event — 1,201 subprocesses — to answer a question about a single file, and the instructions tell agents to call it before modifying anything. Three faults compounded: staleness was computed across the whole event log and then filtered down to the file being checked; the memo key was `(file, timestamp)`, which looks right but never hits because real events carry distinct timestamps; and nothing bounded the git walk. It now makes one `git log` per distinct file, bounded by the oldest event citing it, and counts in memory.
+
+  | events | before | after |
+  |---|---|---|
+  | 100 | 2,210 ms | 48 ms |
+  | 400 | 8,905 ms | 51 ms |
+  | 1,500 | ~33 s, 1,501 git processes | **82 ms, 2 processes** |
+
+  Latency is now flat rather than linear in project age. The project-wide path used by `pjm brief` and the dashboard went from 26,294 ms to 450 ms. Results are unchanged — verified against a reimplementation of the old algorithm, including across merge commits.
+
+### Changed
+
+- **Your project is named in `CLAUDE.md`.** One server serves every project, so a tool call that names none is refused rather than guessed at — but nothing ever told the agent the name, so it learned it from the error and retried. That round trip happened every session. The bridge now carries the registered name and the exact argument to pass. ([#14](https://github.com/riponcm/projectmem/issues/14))
+
+- **Retiring a decision is discoverable.** `supersedes` has existed since 0.1.4 and the summary renderer honours it, but `AI_INSTRUCTIONS.md` mentioned it zero times in 12,503 characters, so models never called it and `summary.md` accumulated decisions that contradicted each other. It is documented now on all three surfaces an agent may read, and each says what it does to the summary rather than only that the argument exists. ([#17](https://github.com/riponcm/projectmem/issues/17))
+
+Windows daemon support in 0.3.2 was contributed by [@medium-effort](https://github.com/medium-effort), who also reported every issue fixed in this release.
+
 ## 0.3.2
 
 **Windows works properly now.** `pjm watch --daemon` crashed there, and fixing the crash uncovered a second bug one function away that had been hiding behind it. Both are fixed. `pjm doctor` also learned to notice when a fix you made gets undone.
