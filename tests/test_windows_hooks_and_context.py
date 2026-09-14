@@ -129,6 +129,60 @@ def test_get_context_uses_the_resolved_project_not_cwd(tmp_path, monkeypatch):
     assert seen["root"] == tmp_path / "realproj", "root must be the resolved project"
 
 
+def test_precheck_file_uses_the_resolved_project_not_cwd(tmp_path, monkeypatch):
+    """The same defect as get_context, one tool over.
+
+    precheck_file resolved the root to READ events, then called
+    _analyze_files without it. Staleness then asked "does this file
+    exist?" relative to the server's cwd, so every cited file in every
+    project but the server's own looked deleted — and the churn count
+    came from whatever git repo the server happened to sit in.
+    """
+    from projectmem import mcp_server
+    from projectmem.commands import precheck as precheck_mod
+
+    seen = {}
+
+    def spy(files, events, root=None):
+        seen["root"] = root
+        return []
+
+    monkeypatch.setattr(precheck_mod, "_analyze_files", spy)
+    monkeypatch.setattr(mcp_server, "_root_for", lambda project: tmp_path / "realproj")
+    monkeypatch.setattr(mcp_server, "read_events", lambda root: [])
+
+    fn = (mcp_server.precheck_file.fn
+          if hasattr(mcp_server.precheck_file, "fn") else mcp_server.precheck_file)
+    fn(file_path="src/a.py", project="realproj")
+
+    assert seen["root"] == tmp_path / "realproj", "root must be the resolved project"
+
+def test_precheck_churn_counts_the_projects_git_not_the_servers(tmp_path, monkeypatch):
+    """The churn number came from whatever repo the process sat in.
+
+    _analyze_files received root but called _git_recent_changes without
+    it, so `git log` ran in the server's cwd. Outside a repo git fails and
+    the count silently fell back to the event log, inventing churn the
+    project does not have.
+    """
+    from projectmem.commands import precheck as precheck_mod
+    from projectmem.models import Event
+
+    seen = {}
+
+    def spy(file_path, days, root=None):
+        seen["root"] = root
+        return 0
+
+    monkeypatch.setattr(precheck_mod, "_git_recent_changes", spy)
+    monkeypatch.chdir(tmp_path)
+
+    events = [Event(id="evt_1", type="note", timestamp="2099-01-01T00:00:00Z",
+                    summary="a note", location="src/a.py:1")]
+    precheck_mod._analyze_files(["src/a.py"], events, root=tmp_path / "realproj")
+
+    assert seen["root"] == tmp_path / "realproj", "churn must be counted in the project"
+
 # ── expected errors were reported as crashes ────────────────────────────────
 
 def test_an_expected_error_prints_no_traceback(tmp_path):

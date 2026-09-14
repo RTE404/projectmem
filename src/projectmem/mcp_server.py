@@ -334,8 +334,9 @@ def precheck_file(
 
     Read-only; does not modify memory."""
     from projectmem.commands.precheck import _analyze_files
-    events = read_events(_root_for(project))
-    warnings = _analyze_files([file_path], events)
+    root = _root_for(project)
+    events = read_events(root)
+    warnings = _analyze_files([file_path], events, root=root)
     if not warnings:
         return f"{file_path}: no warnings. Safe to modify."
     lines = [f"projectmem precheck: {file_path}"]

@@ -327,7 +327,7 @@ def _analyze_files(
         # Source of truth is `git log` over the window, not the event log
         # (L-023a). Counting events would understate fresh, repeated edits
         # that the memory layer hasn't captured yet.
-        git_churn = _git_recent_changes(file_path, RECENT_DAYS)
+        git_churn = _git_recent_changes(file_path, RECENT_DAYS, root)
         churn_count = git_churn if git_churn is not None else sum(
             1 for e in recent if e.git_commit
         )
