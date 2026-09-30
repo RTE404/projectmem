@@ -10,7 +10,7 @@
   </p>
 
   <p><b>We don't make AI smarter. We make it experienced.</b></p>
-  <p><i><b>Coding agent memory</b> — the local-first memory + judgment layer for AI coding agents. One MCP server for every project. Save up to 50%+ of AI tokens. Stop repeating yesterday's bug.</i></p>
+  <p><i><b>Coding agent memory</b> — the local-first memory + judgment layer for AI coding agents. One MCP server for every project. Stop re-reading your project every session. Stop repeating yesterday's bug.</i></p>
 
   <p>
     <a href="https://pypi.org/project/projectmem/"><img src="https://img.shields.io/pypi/v/projectmem.svg?color=4c1d95&label=pypi" alt="PyPI version"></a>
@@ -242,7 +242,7 @@ console — after it had already created everything, so the command both did its
 work and reported failure.
 
 Every one was fixed by running projectmem on the machines that reported it —
-Windows 11, and the four MCP clients — not by reading the code. Reported by
+Windows 11, and three MCP clients (Antigravity, Claude, and Codex) — not by reading the code. Reported by
 [@medium-effort](https://github.com/riponcm/projectmem/issues), who also
 contributed the 0.3.2 Windows daemon support.
 
@@ -364,10 +364,10 @@ Your project's memory is also something you can *watch* — and share.
 - **Session-Start Briefing** *(new in 0.1.4)* — `pjm brief` answers "where was I?" in one screen: active warnings, possibly-stale memories, open issues, recent decisions, stack gotchas, and your prevention score with a week-over-week delta.
 - **Memory for agents without MCP** *(new in 0.1.4)* — `pjm export --claude-md` compiles live decisions, gotchas, and a "Do NOT retry — these already failed" list into a marked block in CLAUDE.md (or `.cursorrules`). Copilot, plain Claude, any agent that reads the file inherits your project's judgment.
 - **Smart Context Injection** — `pjm wrap claude` (or cursor/aider) injects a token-budgeted memory block into your AI before the session opens. Your AI starts experienced, not blank.
-- **Provable ROI Score** — `pjm score` outputs a letter grade (A+ → F) backed by concrete numbers — debugging hours saved, tokens prevented, dollars protected. CI-friendly JSON output and shields.io badge for your README.
+- **Estimated ROI Score** — `pjm score` outputs a letter grade (A+ → F) with the tool's own estimates of debugging hours saved, tokens avoided, and dollars saved. CI-friendly JSON output and shields.io badge for your README.
 - **Cross-Project Memory** — Lessons learned in one repo follow you forever. Library gotchas, decisions, and patterns live in `~/.projectmem/global/` and auto-inherit into every new project that matches your stack.
 - **Real-time File Watcher** — Background daemon detects rapid edits to the same file (debugging sessions) between commits. Battery-aware, gitignore-aware, auto-started by `pjm init`.
-- **Native MCP Server** — Plugs into Claude Desktop, Cursor, Antigravity, Codex, and any MCP-compatible tool. 15 native tools force the AI to read context, check files for known failures, read your `plan.md`, and log work automatically. Verified end-to-end against all four clients.
+- **Native MCP Server** — Plugs into Claude Desktop, Cursor, Antigravity, Codex, and any MCP-compatible tool. 17 native tools force the AI to read context, check files for known failures, read your `plan.md`, and log work automatically. Verified end-to-end in all four clients at first release; the 0.3.3 acceptance suite was re-run in Antigravity, Claude, and Codex.
 - **Interactive Dashboard** *(expanded in 0.1.6)* — `pjm visualize` opens a six-tab local dashboard: Overview, Story Map (failure heatmap with collapse/focus controls), ROI Dashboard, Project Map (**Flow** / Tree / Graph, now over your real code structure), Timeline (**Time Spine** / Details), and **Showoff** — animated story scenes with a built-in video recorder.
 - **One MCP server for every project** *(new in 0.3.0)* — configure your client once instead of once per repository. Calls name their project (`project="ossdrop"`), or fall back to the active one; every write reports which repo it landed in, and a pinned `--root` server refuses to write outside its own. Existing single-project setups are untouched.
 - **Global Dashboard** *(new in 0.2.0)* — `pjm dashboard` is one cross-project view over every repo you've `pjm init`-ed: grades, issues, savings, and per-project drill-in. A global *view*, never a global *store* — each repo's memory is aggregated at read time and never leaves its folder. Serverless by default; `--serve` for an ephemeral live server (Ctrl+C to stop).
@@ -387,7 +387,7 @@ Your project's memory is also something you can *watch* — and share.
 | Records architectural decisions | ✅ | ❌ | 🟡 | ❌ | ❌ |
 | Memory for agents without MCP | ✅ CLAUDE.md export | ❌ | ❌ | ❌ | 🟡 |
 | Cross-project memory | ✅ library-scoped | 🟡 | 🟡 | 🟡 | 🟡 |
-| Provable ROI score | ✅ A+ → F + $ | ❌ | ❌ | ❌ | ❌ |
+| Estimated ROI score | ✅ A+ → F + $ | ❌ | ❌ | ❌ | ❌ |
 | Plain-text, greppable store | ✅ events.jsonl | ❌ | ❌ | ❌ | 🟡 |
 | No persistent server or DB | ✅ stdio + files † | ❌ | ❌ | ❌ | ❌ server + DB |
 | No telemetry, no accounts | ✅ | ❌ default-on | ✅ | ❌ | 🟡 |
@@ -514,7 +514,7 @@ Hi — I use projectmem as this project's memory. Before anything else,
 call get_instructions(), then get_summary(), then get_project_map() to
 load what we already know. As we work, log issues, attempts
 (failed/worked), fixes, decisions, and notes with the projectmem tools,
-and call precheck_file(path) before you edit a file. Ideas and plans go
+and call precheck_file(file_path) before you edit a file. Ideas and plans go
 in plan.md via get_plan() — never as events.
 ```
 
@@ -678,7 +678,7 @@ root or rely on the parent-walk auto-discovery.
 All 17 tools your AI can call. Every repo tool takes an optional
 `project` argument — see [One server, many projects](#one-server-many-projects):
 
-**Read-side (10 tools):**
+**Read-side (12 tools):**
 
 | Tool | When to use |
 |---|---|
@@ -686,12 +686,14 @@ All 17 tools your AI can call. Every repo tool takes an optional
 | `get_summary()` | Start and end — distilled project memory |
 | `get_project_map()` | Start — understand repo structure |
 | `get_plan()` | Read `plan.md` — the ideas + plans (intent), separate from the event log |
-| `precheck_file(path)` | Before editing any file — surface failure history |
+| `precheck_file(file_path)` | Before editing any file — surface failure history |
 | `get_issue(id)` | Read one specific issue's full history by ID |
 | `search_events(query)` | Plain-text search across all logged events |
 | `get_context(tokens, focus)` | Token-budgeted memory block with optional focus filter |
 | `get_score()` | A+→F prevention score + ROI numbers |
 | `get_global_gotchas(library)` | Cross-project library lessons inherited from past repos |
+| `list_projects()` | See every registered project, and which one is active |
+| `current_project()` | Check which project a call would resolve to, without writing anything |
 
 **Write-side (5 tools):**
 
