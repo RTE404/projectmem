@@ -51,6 +51,8 @@ def test_location_skips_projectmem_files(tmp_path):
     event = read_events(root)[-1]
     assert event.type == "fix"
     assert event.location == "src/login.py"
+    # Only the location moves; the event still records every file it touched.
+    assert ".projectmem/summary.md" in event.files
 
 
 def test_a_memory_only_commit_has_no_location(tmp_path):
